@@ -3,7 +3,7 @@
    -----------------------------------------------------------------------------
    Servidor con Node.js + Express + EJS.
    Base de datos:
-     - Con la variable DATABASE_URL: PostgreSQL (Railway o un PostgreSQL local).
+     - Con la variable DATABASE_URL: PostgreSQL (Render o un PostgreSQL local).
      - Sin DATABASE_URL: SQLite en el archivo recetas.db (para probar rápido).
    La tabla "recetas" se crea sola al iniciar y, si está vacía, se llena con
    13 recetas de ejemplo.
@@ -17,7 +17,8 @@ const express = require('express');
 const multer = require('multer');
 
 const PUERTO = Number(process.env.PORT) || 3000;
-const VERSION = String(process.env.RAILWAY_DEPLOYMENT_ID || Date.now().toString(36)).slice(0, 12);
+// Cambia en cada despliegue para que el navegador pida el CSS y el JS nuevos
+const VERSION = String(process.env.RENDER_GIT_COMMIT || process.env.RAILWAY_DEPLOYMENT_ID || Date.now().toString(36)).slice(0, 12);
 const MAX_FOTO = 5 * 1024 * 1024; // 5 MB (el navegador la achica antes de subirla)
 const MAX_ID = 2147483647; // el id más alto que cabe en una columna INTEGER de PostgreSQL
 
@@ -194,8 +195,8 @@ const esquema = (pg) => `CREATE TABLE IF NOT EXISTS recetas (
   actualizada_en TEXT NOT NULL
 )`;
 
-// Fallas de conexión que se arreglan solas al reintentar: la base se está despertando (en el plan
-// gratis de Railway se duerme cuando nadie la usa), se reinició o la red privada todavía no está lista.
+// Fallas de conexión que se arreglan solas al reintentar: la base se está despertando (en algunos
+// planes gratis se duerme cuando nadie la usa), se reinició o la red privada todavía no está lista.
 const CODIGOS_DE_CONEXION = new Set([
   'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'EPIPE', 'EAI_AGAIN', 'ENOTFOUND', 'EHOSTUNREACH', 'ENETUNREACH',
   '57P01', '57P02', '57P03', '08000', '08001', '08003', '08004', '08006',
@@ -429,7 +430,8 @@ const valoresDe = (r) => ({
   imagen_url: r.imagen_url, video_url: r.video_url, destacada: Number(r.destacada), quitar_imagen: 0,
 });
 
-// Subida de la foto: en memoria y de ahí a la base de datos (Railway borra los archivos en cada despliegue)
+// Subida de la foto: en memoria y de ahí a la base de datos (Render borra los archivos del servidor
+// en cada despliegue y cada vez que el servicio se duerme)
 const multerFoto = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_FOTO, files: 1, fields: 40, fieldSize: 64 * 1024 },
@@ -519,6 +521,7 @@ function elegirPlatos(todas) {
 
 function urlBase(req) {
   if (process.env.URL_PUBLICA) return process.env.URL_PUBLICA.replace(/\/+$/, '');
+  if (process.env.RENDER_EXTERNAL_URL) return process.env.RENDER_EXTERNAL_URL.replace(/\/+$/, '');
   if (process.env.RAILWAY_PUBLIC_DOMAIN) return `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
   return `${req.protocol}://${req.get('host')}`;
 }
@@ -725,7 +728,7 @@ function noEncontrada(req, res) {
   });
 }
 
-// Salud (Railway puede usarla para saber si el sitio está vivo)
+// Salud (Render la usa para saber si el sitio está vivo: Health Check Path = /salud)
 app.get('/salud', async (req, res) => {
   const fila = await db.get('SELECT COUNT(*) AS n FROM recetas');
   res.json({ ok: true, base: db.tipo, recetas: Number(fila.n) });
@@ -1110,8 +1113,8 @@ async function iniciar() {
     const n = await cargarEjemplos(false);
     console.log(`[cuisine] Recetario vacío: cargué ${n} recetas de ejemplo.`);
   }
-  if (!db.esPg && (process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_PROJECT_ID)) {
-    console.warn('[cuisine] Estás en Railway sin DATABASE_URL: SQLite se borra en cada despliegue. Agrega una base PostgreSQL.');
+  if (!db.esPg && (process.env.RENDER || process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_PROJECT_ID)) {
+    console.warn('[cuisine] AVISO: estás en la nube sin DATABASE_URL. SQLite se borra cada vez que el servidor se reinicia o se duerme. Agrega la variable DATABASE_URL con la URL de tu base PostgreSQL.');
   }
   const servidor = app.listen(PUERTO, () => {
     console.log(`[cuisine] Recetario listo en http://localhost:${PUERTO} · Base de datos: ${db.tipo}`);

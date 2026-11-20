@@ -1,0 +1,18 @@
+# Dependencias (se instalan con npm install)
+node_modules/
+
+# Variables privadas: nunca se suben a GitHub
+.env
+
+# Base de datos local de pruebas (SQLite)
+recetas.db
+recetas.db-journal
+recetas.db-wal
+recetas.db-shm
+
+# Archivos del sistema y del editor
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+.claude/
