@@ -1,0 +1,432 @@
+<%
+/* =============================================================================
+   index.ejs · Portada y recetario de Cuisine
+   -----------------------------------------------------------------------------
+   Además de la página principal, este archivo guarda las piezas que comparten
+   las tres páginas. receta.ejs y editar.ejs las usan así:
+     include('index', { parte: 'head' })       metadatos, fuentes y estilos
+     include('index', { parte: 'cabecera' })   menú
+     include('index', { parte: 'pie' })        pie de página
+     include('index', { parte: 'cierre' })     ventana de eliminar, avisos y scripts
+     include('index', { parte: 'tarjetas', soloTarjetas: [...] })
+     include('index', { parte: 'plato', platoDe: receta })
+   ============================================================================= */
+
+const PLURAL = { 'Desayuno': 'Desayunos', 'Entrada': 'Entradas', 'Botana': 'Botanas', 'Antojito': 'Antojitos', 'Ensalada': 'Ensaladas', 'Caldos y sopas': 'Caldos y sopas', 'Platillo fuerte': 'Platillos fuertes', 'Guarnición': 'Guarniciones', 'Salsas y aderezos': 'Salsas y aderezos', 'Postre': 'Postres', 'Bebida': 'Bebidas', 'Panadería': 'Panadería' };
+const NIVEL = { 'Fácil': 1, 'Media': 2, 'Difícil': 3 };
+const enInicio = locals.pagina === 'inicio';
+const ancla = (id) => (enInicio ? '#' : '/#') + id;
+
+/* ---------- Tarjeta de receta ---------- */
+function tarjeta(r) {
+  const total = totalMin(r);
+  const reloj = relojDe(total);
+  const video = videoDe(r.video_url);
+  const url = urlReceta(r);
+  const ss = srcsetDe(r);
+%>
+<article class="receta" id="receta-<%= r.id %>" data-receta data-id="<%= r.id %>" data-tipo="<%= claveTipo(r.tipo) %>" data-tiempo="<%= total %>" data-creada="<%= r.creada_en %>" data-az="<%= r.nombre %>" data-video="<%= video ? 1 : 0 %>" data-busqueda="<%= textoBusqueda(r) %>"<%= r.visible === false ? ' hidden' : '' %>>
+  <a class="receta__foto" href="<%= url %>" tabindex="-1" aria-hidden="true">
+    <img src="<%= fotoDe(r, 800, 600) %>"<% if (ss) { %> srcset="<%= ss %>" sizes="(min-width: 1100px) 380px, (min-width: 700px) 46vw, 92vw"<% } %> width="800" height="600" alt="" loading="lazy" decoding="async">
+    <span class="etiqueta"><span class="punto" aria-hidden="true"></span><%= r.tipo %></span>
+    <% if (video) { %><span class="etiqueta etiqueta--video"><%- ICONOS.play %>Video</span><% } %>
+  </a>
+  <div class="receta__cuerpo">
+    <p class="receta__num">Nº <%= numero(r.id) %><%= r.cocina ? ' · ' + r.cocina : '' %></p>
+    <h3 class="receta__titulo"><a href="<%= url %>"><%= r.nombre %></a></h3>
+    <p class="receta__desc"><%= r.descripcion || (r.tipo + ' listo en ' + tiempoTexto(total) + '.') %></p>
+    <ul class="receta__meta">
+      <li><svg class="mini-reloj" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle class="pista" cx="10" cy="10" r="7.5"/><circle class="arco" cx="10" cy="10" r="7.5" pathLength="60" stroke-dasharray="60" stroke-dashoffset="<%= reloj.minutero %>" transform="rotate(-90 10 10)"/></svg><span class="sr-only">Tiempo total:</span> <%= tiempoTexto(total) %></li>
+      <li><svg class="dificultad" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><% [[3,12,5],[8.5,8,9],[14,4,13]].forEach(([x, y, h], i) => { %><rect<%- i < (NIVEL[r.dificultad] || 1) ? ' class="on"' : '' %> x="<%= x %>" y="<%= y %>" width="3" height="<%= h %>" rx="1"/><% }) %></svg><span class="sr-only">Dificultad:</span> <%= r.dificultad %></li>
+      <li><%- ICONOS.personas %><%= r.porciones %> <%= Number(r.porciones) === 1 ? 'porción' : 'porciones' %></li>
+    </ul>
+    <div class="receta__acciones">
+      <span class="punto receta__rueda" aria-hidden="true"></span>
+      <a class="enlace-flecha" href="<%= url %>">Ver receta<span class="sr-only">: <%= r.nombre %></span><%- ICONOS.flecha %></a>
+      <div class="receta__herr">
+        <a class="btn-icono" href="/recetas/<%= r.id %>/editar" aria-label="Editar <%= r.nombre %>" title="Editar"><%- ICONOS.editar %></a>
+        <a class="btn-icono btn-icono--peligro" href="<%= url %>?eliminar=1#eliminar" data-eliminar="<%= r.id %>" data-nombre="<%= r.nombre %>" aria-label="Eliminar <%= r.nombre %>" title="Eliminar"><%- ICONOS.eliminar %></a>
+      </div>
+    </div>
+  </div>
+</article>
+<% }
+
+/* ---------- Plato-reloj: la foto en un plato que marca el tiempo ---------- */
+function platoReloj(r, o) {
+  o = o || {};
+  const t = totalMin(r);
+  const rel = relojDe(t);
+  const ss = srcsetDe(r, 1);
+%>
+<div class="plato__caja">
+  <svg class="plato__reloj" viewBox="0 0 400 400" aria-hidden="true" focusable="false">
+    <circle class="reloj__borde" cx="200" cy="200" r="164.5"/>
+    <circle class="reloj__filo" cx="200" cy="200" r="173.5"/>
+    <g class="reloj__marcas"><circle class="reloj__min" cx="200" cy="200" r="191" transform="rotate(-90 200 200)"/><circle class="reloj__cinco" cx="200" cy="200" r="191" transform="rotate(-90 200 200)"/></g>
+    <circle class="reloj__arco" cx="200" cy="200" r="180" transform="rotate(-90 200 200)" style="stroke-dashoffset:<%= rel.offset %>" data-arco/>
+    <g class="reloj__aguja" transform="rotate(<%= rel.angulo %> 200 200)" data-aguja data-min="<%= t %>"><circle cx="200" cy="20" r="10" fill="url(#g-punto)"/></g>
+  </svg>
+  <div class="plato__foto">
+    <img src="<%= fotoDe(r, 900, 900) %>"<% if (ss) { %> srcset="<%= ss %>" sizes="<%= o.sizes || '(min-width: 960px) 440px, 78vw' %>"<% } %> width="900" height="900" alt="<%= o.alt || (r.nombre + ' servido en plato') %>"<%- o.prioridad ? ' fetchpriority="high"' : ' loading="lazy"' %> decoding="async" data-plato-img>
+  </div>
+  <% (o.especias ? [[9,9,9,.85,5,-8,9],[91,5,6,.7,-4,6,11],[101,45,5,.6,-5,-5,8],[94,84,10,.9,4,-6,10],[60,101,4,.55,-6,-4,12],[-1,52,6,.7,5,5,9.5],[46,-2,4,.5,6,4,10.5]] : []).forEach(([x, y, s, op, fx, fy, tt]) => { %><span class="especia" aria-hidden="true" style="--x:<%= x %>%;--y:<%= y %>%;--s:<%= s %>px;--o:<%= op %>;--fx:<%= fx %>px;--fy:<%= fy %>px;--t:<%= tt %>s"></span><% }) %>
+</div>
+<% }
+
+if (locals.parte === 'tarjetas') {
+  (locals.soloTarjetas || []).forEach(tarjeta);
+
+} else if (locals.parte === 'plato') {
+  platoReloj(locals.platoDe, locals.platoOpciones);
+
+} else if (locals.parte === 'head') { %>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title><%= titulo %></title>
+<meta name="description" content="<%= descripcion %>">
+<% if (noIndexar) { %><meta name="robots" content="noindex, follow"><% } %>
+<link rel="canonical" href="<%= canonica %>">
+<meta name="theme-color" content="#0B0B0B">
+<meta name="color-scheme" content="dark">
+<meta property="og:type" content="<%= ogTipo %>">
+<meta property="og:site_name" content="Cuisine">
+<meta property="og:title" content="<%= titulo %>">
+<meta property="og:description" content="<%= descripcion %>">
+<meta property="og:image" content="<%= ogImagen %>">
+<meta property="og:url" content="<%= canonica %>">
+<meta property="og:locale" content="es_MX">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/png" href="/img/favicon.png">
+<link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://images.unsplash.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500;1,600&family=Montserrat:wght@500;600;700&family=Poppins:wght@300;400;500;600&display=swap">
+<link rel="stylesheet" href="/styles.css?v=<%= VERSION %>">
+<script>
+document.documentElement.className = document.documentElement.className.replace('no-js', 'js');
+// Si una foto no carga (enlace roto o de un sitio que no permite usarla), se pone la imagen de "sin foto"
+document.addEventListener('error', function (e) {
+  var img = e.target;
+  if (!img || img.tagName !== 'IMG' || img.getAttribute('data-respaldo')) return;
+  img.setAttribute('data-respaldo', '1');
+  img.removeAttribute('srcset');
+  img.src = '/img/sin-foto.svg';
+}, true);
+</script>
+<% } else if (locals.parte === 'cabecera') { %>
+<a class="saltar" href="#contenido">Saltar al contenido</a>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <radialGradient id="g-punto" cx="68%" cy="28%" r="78%">
+      <stop offset="0" stop-color="#E7AE7A"/><stop offset=".34" stop-color="#CD8D58"/><stop offset=".72" stop-color="#A15E32"/><stop offset="1" stop-color="#7C523A"/>
+    </radialGradient>
+  </defs>
+</svg>
+<header class="nav" data-nav>
+  <div class="contenedor nav__in">
+    <a class="nav__logo" href="/" aria-label="Cuisine, inicio"><img src="/img/logo-cuisine-nombre.png" alt="Cuisine" width="560" height="150"></a>
+    <ul class="nav__links">
+      <li><a href="<%= ancla('recetario') %>" data-espia="recetario">Recetario</a></li>
+      <li><a href="<%= ancla('destacada') %>" data-espia="destacada">Destacada</a></li>
+      <li><a href="<%= ancla('como-funciona') %>" data-espia="como-funciona">Cómo funciona</a></li>
+    </ul>
+    <div class="nav__acciones">
+      <a class="btn btn--linea btn--chico nav__agregar" href="/?agregar=1#agregar" data-abrir-agregar><%- ICONOS.mas %>Agregar receta</a>
+      <a class="btn-icono nav__mas" href="/?agregar=1#agregar" data-abrir-agregar aria-label="Agregar receta"><%- ICONOS.mas %></a>
+      <button class="btn-icono nav__menu" type="button" aria-expanded="false" aria-controls="nav-panel" aria-label="Abrir menú" data-menu><%- ICONOS.menu %></button>
+    </div>
+  </div>
+  <div class="contenedor nav__panel" id="nav-panel" hidden>
+    <a href="<%= ancla('recetario') %>"><span class="punto" aria-hidden="true"></span>Recetario</a>
+    <a href="<%= ancla('destacada') %>"><span class="punto" aria-hidden="true"></span>Receta destacada</a>
+    <a href="<%= ancla('como-funciona') %>"><span class="punto" aria-hidden="true"></span>Cómo funciona</a>
+    <a href="/?agregar=1#agregar" data-abrir-agregar><span class="punto" aria-hidden="true"></span>Agregar receta</a>
+  </div>
+</header>
+<% } else if (locals.parte === 'pie') { %>
+<footer class="pie" id="pie">
+  <div class="contenedor">
+    <div class="regla" aria-hidden="true" data-regla><span class="regla__lado"></span><img src="/img/toque.png" alt="" width="150" height="106"><span class="regla__lado regla__lado--der"></span></div>
+    <div class="pie__grid">
+      <div class="pie__marca">
+        <img class="pie__logo" src="/img/logo-cuisine.png" alt="Cuisine" width="900" height="331" loading="lazy" decoding="async">
+        <p class="pie__frase">Recetas caseras para cocinar hoy.</p>
+        <a class="btn btn--cta" href="<%= ancla('recetario') %>" data-ir-buscar><span class="roll" data-text="Buscar receta">Buscar receta</span><%- ICONOS.buscar %></a>
+      </div>
+      <nav class="pie__nav" aria-label="Pie de página">
+        <p class="pie__titulo">Explora</p>
+        <ul>
+          <li><a href="<%= ancla('recetario') %>">Recetario</a></li>
+          <li><a href="<%= ancla('destacada') %>">Receta destacada</a></li>
+          <li><a href="<%= ancla('como-funciona') %>">Cómo funciona</a></li>
+          <li><a href="/?agregar=1#agregar" data-abrir-agregar>Agregar receta</a></li>
+        </ul>
+      </nav>
+      <div class="pie__escuela">
+        <p class="pie__titulo">Proyecto escolar</p>
+        <ul class="pie__datos">
+          <li><b>Estudiante:</b> Efrain Segundo Ornelas</li>
+          <li><b>Código:</b> 221392804</li>
+          <li>Licenciatura en Desarrollo de Sistemas Web</li>
+          <li><b>Materia:</b> Conceptualización de servicios en la nube</li>
+          <li><b>Actividad:</b> Producto Integrador</li>
+        </ul>
+      </div>
+    </div>
+    <div class="pie__base">
+      <p>© <%= new Date().getFullYear() %> Cuisine. Fotos de ejemplo: <a href="https://unsplash.com" target="_blank" rel="noopener">Unsplash</a>.</p>
+      <a class="pie__arriba" href="#contenido" data-arriba>Volver arriba<%- ICONOS.arriba %></a>
+    </div>
+  </div>
+</footer>
+<% } else if (locals.parte === 'cierre') { %>
+<dialog class="ventana ventana--chica" id="ventana-eliminar" aria-labelledby="eliminar-titulo" aria-describedby="eliminar-texto" data-ventana-eliminar>
+  <form class="ventana__caja" method="post" action="" data-form-eliminar>
+    <span class="ventana__icono" aria-hidden="true"><%- ICONOS.eliminar %></span>
+    <h2 class="ventana__titulo" id="eliminar-titulo">¿Eliminar «<span data-eliminar-nombre>esta receta</span>»?</h2>
+    <p class="ventana__texto" id="eliminar-texto">Se borra del recetario para todas las personas y no se puede deshacer.</p>
+    <div class="ventana__botones">
+      <button class="btn btn--linea" type="button" data-cerrar>Cancelar</button>
+      <button class="btn btn--peligro" type="submit" data-confirmar-eliminar>Sí, eliminar</button>
+    </div>
+  </form>
+</dialog>
+<div class="avisos" data-avisos aria-live="polite">
+  <% if (aviso) { %><p class="aviso-toast aviso-toast--<%= aviso.tipo %>" role="status"><span class="punto" aria-hidden="true"></span><span><%= aviso.texto %></span></p><% } %>
+</div>
+<div class="barra-movil" data-barra-movil aria-hidden="true">
+  <a class="btn btn--cta" href="<%= ancla('recetario') %>" data-ir-buscar tabindex="-1"><%- ICONOS.buscar %>Buscar receta</a>
+  <a class="btn-icono barra-movil__mas" href="/?agregar=1#agregar" data-abrir-agregar aria-label="Agregar receta" tabindex="-1"><%- ICONOS.mas %></a>
+</div>
+<script src="/vendor/gsap/gsap.min.js" defer></script>
+<script src="/vendor/gsap/ScrollTrigger.min.js" defer></script>
+<script src="/vendor/gsap/SplitText.min.js" defer></script>
+<script src="/vendor/gsap/Flip.min.js" defer></script>
+<script src="/vendor/lenis/lenis.min.js" defer></script>
+<script src="/app.js?v=<%= VERSION %>" defer></script>
+<% } else {
+  /* ======================= Página principal ======================= */
+  const platoInicial = platos[0];
+  const atajos = ['Desayuno', 'Caldos y sopas', 'Postre', 'Botana', 'Platillo fuerte'].filter((t) => porTipo[claveTipo(t)] > 0).slice(0, 5);
+%><!doctype html>
+<html lang="es-MX" class="no-js">
+<head>
+<%- include('index', { parte: 'head' }) %>
+<script type="application/ld+json"><%- jsonParaScript({ '@context': 'https://schema.org', '@type': 'ItemList', name: 'Recetario Cuisine', itemListElement: recetas.slice(0, 30).map((r, i) => ({ '@type': 'ListItem', position: i + 1, url: canonica.replace(/\/$/, '') + urlReceta(r), name: r.nombre })) }) %></script>
+</head>
+<body class="pagina-inicio">
+<%- include('index', { parte: 'cabecera' }) %>
+
+<main id="contenido">
+<!-- ===== INICIO Portada ===== -->
+<section class="portada" id="inicio" data-portada aria-labelledby="titulo-portada">
+  <div class="contenedor portada__grid">
+    <div class="portada__texto">
+      <p class="ceja" data-hero-in><span class="ceja__linea" aria-hidden="true"></span><span class="punto" aria-hidden="true"></span><span class="ceja__texto">Recetario Cuisine · <span data-total><%= total %></span> <span data-total-palabra><%= total === 1 ? 'receta' : 'recetas' %></span></span></p>
+      <h1 class="portada__titulo" id="titulo-portada">
+        <span class="hero__line"><span class="hero__line-in">¿Qué</span></span>
+        <span class="hero__line"><span class="hero__line-in"><em class="acento">cocinamos</em></span></span>
+        <span class="hero__line"><span class="hero__line-in">hoy?</span></span>
+      </h1>
+      <p class="portada__sub" data-hero-in>Busca recetas caseras por platillo, ingrediente o tiempo. Cocínalas paso a paso o comparte la tuya.</p>
+
+      <form class="buscador" role="search" action="/#recetario" method="get" data-buscador-portada data-hero-in>
+        <label class="sr-only" for="q-portada">Buscar receta</label>
+        <input id="q-portada" name="q" type="search" placeholder="Chilaquiles, pozole, flan…" autocomplete="off" enterkeyhint="search" value="<%= filtros.q %>">
+        <span class="buscador__base" aria-hidden="true" data-base></span>
+        <span class="buscador__linea" aria-hidden="true" data-linea></span>
+        <button class="buscador__boton" type="submit" aria-label="Buscar receta" data-bola><span data-bola-icono><%- ICONOS.buscar %></span></button>
+      </form>
+
+      <% if (atajos.length) { %>
+      <ul class="atajos" aria-label="Atajos de búsqueda" data-hero-in>
+        <% atajos.forEach((t, i) => { %><li<%- i >= 3 ? ' class="atajos__extra"' : '' %>><a class="chip" href="/?tipo=<%= claveTipo(t) %>#recetario" data-atajo-tipo="<%= claveTipo(t) %>"><span class="punto" aria-hidden="true"></span><%= PLURAL[t] || t %></a></li><% }) %>
+        <li><a class="chip" href="/?tiempo=30#recetario" data-atajo-tiempo="30"><span class="punto" aria-hidden="true"></span>En 30 min o menos</a></li>
+      </ul>
+      <% } %>
+    </div>
+
+    <% if (platoInicial) { %>
+    <figure class="plato plato--portada" data-plato data-hero-in>
+      <% platoReloj(recetas.find((r) => r.id === platoInicial.id), { prioridad: true, especias: true, alt: platoInicial.alt }) %>
+      <figcaption class="plato__ficha">
+        <div data-ficha>
+          <p class="ficha__num" data-ficha-num>Nº <%= platoInicial.n %> · <%= platoInicial.tipo %></p>
+          <p class="ficha__nombre"><a href="<%= platoInicial.url %>" data-ficha-nombre><%= platoInicial.nombre %></a></p>
+          <p class="ficha__meta" data-ficha-meta><%= tiempoTexto(platoInicial.min) %> · <%= platoInicial.dif %></p>
+        </div>
+        <div class="ficha__acciones">
+          <a class="enlace-flecha" href="<%= platoInicial.url %>" data-ficha-enlace>Ver receta<%- ICONOS.flecha %></a>
+          <% if (platos.length > 1) { %><button class="btn-texto btn-texto--claro" type="button" data-otra-idea><%- ICONOS.girar %>Otra idea</button><% } %>
+        </div>
+      </figcaption>
+    </figure>
+    <script type="application/json" id="datos-platos"><%- jsonParaScript(platos) %></script>
+    <% } %>
+  </div>
+</section>
+<!-- ===== FIN Portada ===== -->
+
+<!-- ===== INICIO Recetario ===== -->
+<section class="sec recetario" id="recetario" aria-labelledby="t-recetario">
+  <div class="contenedor">
+    <div class="sec__cab">
+      <div class="regla" aria-hidden="true" data-regla><span class="regla__lado"></span><img src="/img/toque.png" alt="" width="150" height="106"><span class="regla__lado regla__lado--der"></span></div>
+      <p class="ceja"><span class="punto" aria-hidden="true"></span>El recetario</p>
+      <h2 class="h2" id="t-recetario" data-split>Recetas para cada momento del día</h2>
+      <p class="sec__intro" data-reveal>Filtra por tipo de platillo o por tiempo, abre cada receta paso a paso y agrega las tuyas.</p>
+    </div>
+
+    <form class="filtros" method="get" action="/#recetario" data-filtros role="search" aria-label="Filtrar recetas">
+      <div class="filtros__fila">
+        <div class="buscador buscador--chico">
+          <label class="sr-only" for="q">Buscar en el recetario</label>
+          <input id="q" name="q" type="search" value="<%= filtros.q %>" placeholder="Busca por platillo o ingrediente" autocomplete="off" enterkeyhint="search" data-q>
+          <span class="buscador__base" aria-hidden="true"></span>
+          <span class="buscador__linea" aria-hidden="true"></span>
+          <button class="buscador__boton" type="submit" aria-label="Buscar receta"><%- ICONOS.buscar %></button>
+        </div>
+        <label class="selector"><span class="selector__txt">Tiempo</span>
+          <select name="tiempo" data-filtro-tiempo>
+            <option value=""<%= !filtros.tiempo ? ' selected' : '' %>>Cualquiera</option>
+            <option value="30"<%= filtros.tiempo === 30 ? ' selected' : '' %>>30 min o menos</option>
+            <option value="60"<%= filtros.tiempo === 60 ? ' selected' : '' %>>1 hora o menos</option>
+          </select>
+        </label>
+        <label class="selector"><span class="selector__txt">Ordenar</span>
+          <select name="orden" data-filtro-orden>
+            <option value="recientes"<%= filtros.orden === 'recientes' ? ' selected' : '' %>>Más recientes</option>
+            <option value="tiempo"<%= filtros.orden === 'tiempo' ? ' selected' : '' %>>Menos tiempo</option>
+            <option value="az"<%= filtros.orden === 'az' ? ' selected' : '' %>>De la A a la Z</option>
+          </select>
+        </label>
+      </div>
+      <fieldset class="tipos">
+        <legend class="sr-only">Tipo de platillo</legend>
+        <div class="tipos__pista" data-tipos>
+          <label class="chip chip--radio"><input class="sr-only" type="radio" name="tipo" value=""<%= !filtros.tipo ? ' checked' : '' %>><span class="punto" aria-hidden="true"></span>Todas<span class="chip__n" data-n-total><%= total %></span></label>
+          <% TIPOS.forEach((t) => { const k = claveTipo(t); const n = porTipo[k]; %><label class="chip chip--radio" data-chip-tipo="<%= k %>"<%= n ? '' : ' hidden' %>><input class="sr-only" type="radio" name="tipo" value="<%= k %>"<%= filtros.tipo === k ? ' checked' : '' %>><span class="punto" aria-hidden="true"></span><%= t %><span class="chip__n" data-n="<%= k %>"><%= n %></span></label><% }) %>
+        </div>
+      </fieldset>
+      <noscript><p class="filtros__sinjs"><button class="btn btn--linea btn--chico" type="submit">Aplicar filtros</button></p></noscript>
+    </form>
+
+    <div class="recetario__barra">
+      <p class="recetario__conteo" data-conteo aria-live="polite">Mostrando <b data-visibles><%= visibles %></b> de <span data-total><%= total %></span> <span data-total-palabra><%= total === 1 ? 'receta' : 'recetas' %></span></p>
+      <a class="btn btn--linea btn--chico" href="/?agregar=1#agregar" data-abrir-agregar><%- ICONOS.mas %>Agregar receta</a>
+    </div>
+
+    <div class="recetas-grid" data-grid>
+      <% recetas.forEach(tarjeta) %>
+    </div>
+
+    <div class="vacio" data-vacio-filtros<%= total > 0 && visibles === 0 ? '' : ' hidden' %>>
+      <span class="vacio__plato" aria-hidden="true"><span class="punto"></span></span>
+      <h3 class="vacio__titulo">No encontré recetas con esos filtros</h3>
+      <p>Prueba con otro ingrediente o quita los filtros para ver todo el recetario.</p>
+      <a class="btn btn--linea" href="/#recetario" data-quitar-filtros>Quitar filtros</a>
+    </div>
+    <div class="vacio" data-vacio-total<%= total === 0 ? '' : ' hidden' %>>
+      <span class="vacio__plato" aria-hidden="true"><span class="punto"></span></span>
+      <h3 class="vacio__titulo">El recetario está vacío</h3>
+      <p>Agrega la primera receta o vuelve a cargar las 13 recetas de ejemplo.</p>
+      <div class="vacio__botones">
+        <a class="btn btn--linea" href="/?agregar=1#agregar" data-abrir-agregar><%- ICONOS.mas %>Agregar receta</a>
+        <form method="post" action="/recetas/ejemplo"><button class="btn btn--linea" type="submit"><%- ICONOS.girar %>Cargar las recetas de ejemplo</button></form>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- ===== FIN Recetario ===== -->
+
+<% if (destacada) {
+  const d = destacada;
+  const vd = videoDe(d.video_url);
+  const ing = lineas(d.ingredientes).filter((l) => !esSubtitulo(l));
+%>
+<!-- ===== INICIO Receta destacada ===== -->
+<section class="sec sec--alt destacada" id="destacada" aria-labelledby="t-destacada">
+  <div class="contenedor destacada__grid">
+    <figure class="plato plato--destacada" data-plato-destacada>
+      <% platoReloj(d, { sizes: '(min-width: 960px) 460px, 84vw' }) %>
+      <figcaption class="plato__tiempo"><span class="punto" aria-hidden="true"></span><%= tiempoTexto(totalMin(d)) %> en total</figcaption>
+    </figure>
+    <div class="destacada__texto">
+      <p class="ceja"><span class="punto" aria-hidden="true"></span>Receta destacada</p>
+      <h2 class="h2" id="t-destacada" data-split><%= d.nombre %></h2>
+      <p class="destacada__desc" data-reveal><%= d.descripcion %></p>
+      <dl class="datos" data-reveal>
+        <div><dt>Preparación</dt><dd><%= tiempoTexto(d.tiempo_preparacion) %></dd></div>
+        <div><dt>Cocción</dt><dd><%= tiempoTexto(d.tiempo_coccion) %></dd></div>
+        <div><dt>Porciones</dt><dd><%= d.porciones %></dd></div>
+        <div><dt>Dificultad</dt><dd><%= d.dificultad %></dd></div>
+      </dl>
+      <h3 class="mini-titulo" data-reveal>Lo que necesitas</h3>
+      <ul class="lista-punto" data-ingredientes-destacada>
+        <% ing.slice(0, 6).forEach((l) => { %><li><span class="punto" aria-hidden="true"></span><%= l %></li><% }) %>
+        <% if (ing.length > 6) { %><li class="lista-punto__mas">y <%= ing.length - 6 %> ingredientes más</li><% } %>
+      </ul>
+      <div class="destacada__acciones" data-reveal>
+        <a class="btn btn--linea" href="<%= urlReceta(d) %>">Ver receta completa<%- ICONOS.flecha %></a>
+        <% if (vd) { %><span class="insignia"><%- ICONOS.video %>Incluye video</span><% } %>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- ===== FIN Receta destacada ===== -->
+<% } %>
+
+<!-- ===== INICIO Cómo funciona ===== -->
+<section class="sec como" id="como-funciona" aria-labelledby="t-como">
+  <div class="contenedor">
+    <div class="sec__cab">
+      <div class="regla" aria-hidden="true" data-regla><span class="regla__lado"></span><img src="/img/toque.png" alt="" width="150" height="106"><span class="regla__lado regla__lado--der"></span></div>
+      <p class="ceja"><span class="punto" aria-hidden="true"></span>Cómo funciona</p>
+      <h2 class="h2" id="t-como" data-split>Busca, cocina y comparte en tres pasos</h2>
+    </div>
+    <div class="pasos-como" data-pasos-como>
+      <div class="pasos-como__linea" aria-hidden="true"><span class="pasos-como__traza" data-traza></span><span class="punto pasos-como__punto" data-punto-pasos></span></div>
+      <ol class="pasos-como__lista">
+        <li class="paso-como" data-reveal><span class="paso-como__num">01</span><h3 class="paso-como__titulo">Busca</h3><p>Escribe un platillo o un ingrediente que tengas en casa, o filtra por tipo y por tiempo.</p></li>
+        <li class="paso-como" data-reveal><span class="paso-como__num">02</span><h3 class="paso-como__titulo">Cocina</h3><p>Palomea los ingredientes y sigue los pasos numerados. Si la receta trae video, lo ves ahí mismo.</p></li>
+        <li class="paso-como" data-reveal><span class="paso-como__num">03</span><h3 class="paso-como__titulo">Comparte</h3><p>Agrega tu receta con foto y video. También puedes editarla o eliminarla cuando quieras.</p></li>
+      </ol>
+    </div>
+    <div class="cifras" data-reveal>
+      <p class="cifra"><span class="cifra__num" data-cifra="total"><%= cifras.total %></span><span class="cifra__txt">recetas en el recetario</span></p>
+      <p class="cifra"><span class="cifra__num" data-cifra="tipos"><%= cifras.tipos %></span><span class="cifra__txt">tipos de platillo</span></p>
+      <p class="cifra"><span class="cifra__num" data-cifra="rapidas"><%= cifras.rapidas %></span><span class="cifra__txt">listas en 30 min o menos</span></p>
+      <p class="cifra"><span class="cifra__num" data-cifra="video"><%= cifras.video %></span><span class="cifra__txt">con video de la preparación</span></p>
+    </div>
+    <p class="cifras__fuente" data-reveal>Cifras del propio recetario al <%= hoy %>. Cambian solas cada vez que alguien agrega o elimina una receta.</p>
+    <div class="como__acciones" data-reveal>
+      <a class="btn btn--cta" href="#recetario" data-ir-buscar><span class="roll" data-text="Buscar receta">Buscar receta</span><%- ICONOS.buscar %></a>
+      <a class="btn btn--linea" href="/?agregar=1#agregar" data-abrir-agregar><%- ICONOS.mas %>Agregar receta</a>
+    </div>
+  </div>
+</section>
+<!-- ===== FIN Cómo funciona ===== -->
+</main>
+
+<%- include('index', { parte: 'pie' }) %>
+
+<!-- ===== Ventana para agregar receta ===== -->
+<dialog class="ventana" id="agregar" aria-labelledby="agregar-titulo" data-ventana-agregar<%= agregarAbierto ? ' open' : '' %>>
+  <div class="ventana__marco" data-lenis-prevent>
+    <header class="ventana__cab">
+      <div>
+        <p class="ceja"><span class="punto" aria-hidden="true"></span>Nueva receta</p>
+        <h2 class="ventana__titulo" id="agregar-titulo">Agregar receta</h2>
+      </div>
+      <a class="btn-icono" href="/#recetario" data-cerrar aria-label="Cerrar sin guardar"><%- ICONOS.cerrar %></a>
+    </header>
+    <%- include('editar', { parte: 'formulario', modo: 'agregar', receta: null, valores, errores }) %>
+  </div>
+</dialog>
+
+<%- include('index', { parte: 'cierre' }) %>
+</body>
+</html>
+<% } %>

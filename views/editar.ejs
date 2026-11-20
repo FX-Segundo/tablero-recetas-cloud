@@ -1,0 +1,200 @@
+<%
+/* =============================================================================
+   editar.ejs · Página para editar una receta
+   -----------------------------------------------------------------------------
+   También guarda el formulario de receta. La ventana "Agregar receta" de
+   index.ejs lo usa con: include('editar', { parte: 'formulario', modo: 'agregar' })
+   ============================================================================= */
+
+function formulario(o) {
+  const v = o.valores || {};
+  const e = o.errores || {};
+  const r = o.receta;
+  const esEditar = o.modo === 'editar';
+  const p = o.modo;
+  const id = (nombre) => `${p}-${nombre}`;
+  const accion = esEditar ? `/recetas/${r.id}/editar` : '/recetas';
+  const etiquetas = v.etiquetas || [];
+  const hayErrores = Object.keys(e).length > 0;
+  const clase = (nombre, extra) => `campo${extra ? ' ' + extra : ''}${e[nombre] ? ' campo--error' : ''}`;
+  const invalido = (nombre) => (e[nombre] ? ' aria-invalid="true"' : '');
+%>
+<form class="formulario" method="post" action="<%= accion %>" enctype="multipart/form-data" data-formulario-receta data-modo="<%= o.modo %>">
+  <div class="formulario__errores" role="alert" tabindex="-1" data-resumen-errores<%= hayErrores ? '' : ' hidden' %>>Revisa los campos marcados para continuar.</div>
+
+  <fieldset class="bloque">
+    <legend class="bloque__titulo"><span class="bloque__num">01</span>Lo básico</legend>
+    <div class="<%= clase('nombre', 'campo--ancho') %>">
+      <label for="<%= id('nombre') %>">Nombre de la receta <span class="req" aria-hidden="true">*</span></label>
+      <input id="<%= id('nombre') %>" name="nombre" type="text" required minlength="2" maxlength="120" value="<%= v.nombre || '' %>" placeholder="Ej. Tinga de pollo" autocomplete="off" aria-describedby="<%= id('nombre') %>-error"<%- invalido('nombre') %>>
+      <p class="campo__error" id="<%= id('nombre') %>-error" data-error="nombre"><%= e.nombre || '' %></p>
+    </div>
+    <div class="campo campo--ancho">
+      <label for="<%= id('descripcion') %>">Descripción corta <span class="opcional">(opcional)</span></label>
+      <textarea id="<%= id('descripcion') %>" name="descripcion" rows="2" maxlength="320" placeholder="Una o dos frases: qué es y por qué se antoja." data-contador><%= v.descripcion || '' %></textarea>
+      <p class="campo__ayuda"><span data-cuenta><%= (v.descripcion || '').length %></span> de 320 caracteres</p>
+    </div>
+    <div class="<%= clase('tipo') %>">
+      <label for="<%= id('tipo') %>">Tipo de platillo <span class="req" aria-hidden="true">*</span></label>
+      <select id="<%= id('tipo') %>" name="tipo" required aria-describedby="<%= id('tipo') %>-error"<%- invalido('tipo') %>>
+        <option value="">Elige uno</option>
+        <% TIPOS.forEach((t) => { %><option<%= v.tipo === t ? ' selected' : '' %>><%= t %></option><% }) %>
+      </select>
+      <p class="campo__error" id="<%= id('tipo') %>-error" data-error="tipo"><%= e.tipo || '' %></p>
+    </div>
+    <div class="campo">
+      <label for="<%= id('cocina') %>">Cocina <span class="opcional">(opcional)</span></label>
+      <input id="<%= id('cocina') %>" name="cocina" type="text" list="<%= id('cocinas') %>" maxlength="40" value="<%= v.cocina || '' %>" placeholder="Ej. Mexicana" autocomplete="off">
+      <datalist id="<%= id('cocinas') %>"><% COCINAS.forEach((c) => { %><option value="<%= c %>"><% }) %></datalist>
+    </div>
+    <fieldset class="campo campo--ancho segmentado">
+      <legend>Dificultad</legend>
+      <div class="segmentado__opciones">
+        <% DIFICULTADES.forEach((d) => { %><label><input type="radio" name="dificultad" value="<%= d %>"<%= (v.dificultad || 'Fácil') === d ? ' checked' : '' %>><span><%= d %></span></label><% }) %>
+      </div>
+    </fieldset>
+  </fieldset>
+
+  <fieldset class="bloque">
+    <legend class="bloque__titulo"><span class="bloque__num">02</span>Tiempos y porciones</legend>
+    <div class="<%= clase('tiempo_preparacion', 'campo--tercio') %>">
+      <label for="<%= id('prep') %>">Preparación <span class="unidad">min</span> <span class="req" aria-hidden="true">*</span></label>
+      <input id="<%= id('prep') %>" name="tiempo_preparacion" type="number" inputmode="numeric" min="0" max="1440" step="1" required value="<%= v.tiempo_preparacion ?? '' %>" placeholder="15" data-tiempo-campo aria-describedby="<%= id('prep') %>-error"<%- invalido('tiempo_preparacion') %>>
+      <p class="campo__error" id="<%= id('prep') %>-error" data-error="tiempo_preparacion"><%= e.tiempo_preparacion || '' %></p>
+    </div>
+    <div class="<%= clase('tiempo_coccion', 'campo--tercio') %>">
+      <label for="<%= id('coccion') %>">Cocción <span class="unidad">min</span></label>
+      <input id="<%= id('coccion') %>" name="tiempo_coccion" type="number" inputmode="numeric" min="0" max="1440" step="1" value="<%= v.tiempo_coccion ?? '' %>" placeholder="20" data-tiempo-campo aria-describedby="<%= id('coccion') %>-error"<%- invalido('tiempo_coccion') %>>
+      <p class="campo__error" id="<%= id('coccion') %>-error" data-error="tiempo_coccion"><%= e.tiempo_coccion || '' %></p>
+    </div>
+    <div class="<%= clase('porciones', 'campo--tercio') %>">
+      <label for="<%= id('porciones') %>">Porciones <span class="req" aria-hidden="true">*</span></label>
+      <input id="<%= id('porciones') %>" name="porciones" type="number" inputmode="numeric" min="1" max="100" step="1" required value="<%= v.porciones ?? '' %>" placeholder="4" aria-describedby="<%= id('porciones') %>-error"<%- invalido('porciones') %>>
+      <p class="campo__error" id="<%= id('porciones') %>-error" data-error="porciones"><%= e.porciones || '' %></p>
+    </div>
+    <p class="bloque__total" data-total-tiempo aria-live="polite"><svg class="mini-reloj" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle class="pista" cx="10" cy="10" r="7.5"/><circle class="arco" cx="10" cy="10" r="7.5" pathLength="60" stroke-dasharray="60" stroke-dashoffset="60" transform="rotate(-90 10 10)" data-total-arco/></svg>Tiempo total: <b data-total-texto>escribe los minutos</b></p>
+  </fieldset>
+
+  <fieldset class="bloque">
+    <legend class="bloque__titulo"><span class="bloque__num">03</span>Foto del platillo</legend>
+    <% if (esEditar && tieneFoto(r)) { %>
+    <div class="foto-actual campo--ancho">
+      <img src="<%= fotoDe(r, 480, 360) %>" alt="Foto actual de <%= r.nombre %>" width="480" height="360" loading="lazy">
+      <div>
+        <p class="foto-actual__txt">Foto actual. Se queda igual si no subes otra.</p>
+        <label class="casilla"><input type="checkbox" name="quitar_imagen" value="1"<%= v.quitar_imagen ? ' checked' : '' %>><span class="casilla__caja" aria-hidden="true"><%- ICONOS.check %></span><span>Quitar la foto</span></label>
+      </div>
+    </div>
+    <% } %>
+    <div class="<%= clase('imagen', 'campo--ancho') %>">
+      <label class="soltar" for="<%= id('imagen') %>" data-soltar>
+        <input class="soltar__input" id="<%= id('imagen') %>" name="imagen" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" data-foto-input aria-describedby="<%= id('imagen') %>-error">
+        <span class="soltar__vista" data-foto-vista hidden></span>
+        <span class="soltar__texto">
+          <%- ICONOS.foto %>
+          <b data-foto-nombre><%= esEditar ? 'Sube otra foto' : 'Elige o arrastra la foto' %></b>
+          <span>JPG, PNG o WebP de hasta 5 MB. Se achica sola antes de subirse.</span>
+        </span>
+      </label>
+      <p class="campo__error" id="<%= id('imagen') %>-error" data-error="imagen"><%= e.imagen || '' %></p>
+    </div>
+    <div class="<%= clase('imagen_url', 'campo--ancho') %>">
+      <label for="<%= id('imagen_url') %>">O pega el enlace de una foto <span class="opcional">(opcional)</span></label>
+      <input id="<%= id('imagen_url') %>" name="imagen_url" type="url" inputmode="url" maxlength="800" value="<%= v.imagen_url || '' %>" placeholder="https://…" autocomplete="off" aria-describedby="<%= id('imagen_url') %>-error"<%- invalido('imagen_url') %>>
+      <p class="campo__error" id="<%= id('imagen_url') %>-error" data-error="imagen_url"><%= e.imagen_url || '' %></p>
+    </div>
+  </fieldset>
+
+  <fieldset class="bloque">
+    <legend class="bloque__titulo"><span class="bloque__num">04</span>Video de la preparación</legend>
+    <div class="<%= clase('video_url', 'campo--ancho') %>">
+      <label for="<%= id('video') %>">Enlace del video <span class="opcional">(opcional)</span></label>
+      <input id="<%= id('video') %>" name="video_url" type="url" inputmode="url" maxlength="300" value="<%= v.video_url || '' %>" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off" data-video-input aria-describedby="<%= id('video') %>-ayuda <%= id('video') %>-error"<%- invalido('video_url') %>>
+      <p class="campo__ayuda" id="<%= id('video') %>-ayuda">Pega un enlace de YouTube o Vimeo. El video se ve dentro de la receta.</p>
+      <p class="campo__error" id="<%= id('video') %>-error" data-error="video_url"><%= e.video_url || '' %></p>
+      <div class="video-previa" data-video-previa hidden><span class="video-previa__img" data-video-portada></span><span class="video-previa__txt"><%- ICONOS.check %><span data-video-texto>Video listo</span></span></div>
+    </div>
+  </fieldset>
+
+  <fieldset class="bloque">
+    <legend class="bloque__titulo"><span class="bloque__num">05</span>Ingredientes y preparación</legend>
+    <div class="<%= clase('ingredientes', 'campo--ancho') %>">
+      <label for="<%= id('ingredientes') %>">Ingredientes <span class="req" aria-hidden="true">*</span></label>
+      <textarea id="<%= id('ingredientes') %>" name="ingredientes" rows="7" required maxlength="6000" placeholder="2 tazas de arroz&#10;1 jitomate&#10;Para la salsa:&#10;3 chiles guajillo" aria-describedby="<%= id('ingredientes') %>-ayuda <%= id('ingredientes') %>-error"<%- invalido('ingredientes') %>><%= v.ingredientes || '' %></textarea>
+      <p class="campo__ayuda" id="<%= id('ingredientes') %>-ayuda">Uno por renglón. Para un subtítulo, termina el renglón con dos puntos, como «Para la salsa:».</p>
+      <p class="campo__error" id="<%= id('ingredientes') %>-error" data-error="ingredientes"><%= e.ingredientes || '' %></p>
+    </div>
+    <div class="<%= clase('pasos', 'campo--ancho') %>">
+      <label for="<%= id('pasos') %>">Modo de preparación <span class="req" aria-hidden="true">*</span></label>
+      <textarea id="<%= id('pasos') %>" name="pasos" rows="7" required maxlength="12000" placeholder="Lava y pica la verdura.&#10;Calienta el aceite en una olla.&#10;…" aria-describedby="<%= id('pasos') %>-ayuda <%= id('pasos') %>-error"<%- invalido('pasos') %>><%= v.pasos || '' %></textarea>
+      <p class="campo__ayuda" id="<%= id('pasos') %>-ayuda">Un paso por renglón. Se numeran solos.</p>
+      <p class="campo__error" id="<%= id('pasos') %>-error" data-error="pasos"><%= e.pasos || '' %></p>
+    </div>
+  </fieldset>
+
+  <fieldset class="bloque">
+    <legend class="bloque__titulo"><span class="bloque__num">06</span>Detalles</legend>
+    <fieldset class="campo campo--ancho">
+      <legend>Etiquetas</legend>
+      <div class="casillas">
+        <% ETIQUETAS.forEach((t) => { %><label class="casilla casilla--chip"><input type="checkbox" name="etiquetas" value="<%= t %>"<%= etiquetas.includes(t) ? ' checked' : '' %>><span class="casilla__caja" aria-hidden="true"><%- ICONOS.check %></span><span><%= t %></span></label><% }) %>
+      </div>
+    </fieldset>
+    <div class="campo campo--ancho">
+      <label for="<%= id('consejo') %>">Consejo <span class="opcional">(opcional)</span></label>
+      <textarea id="<%= id('consejo') %>" name="consejo" rows="2" maxlength="600" placeholder="Un truco para que salga mejor."><%= v.consejo || '' %></textarea>
+    </div>
+    <div class="campo">
+      <label for="<%= id('autor') %>">¿Quién la comparte? <span class="opcional">(opcional)</span></label>
+      <input id="<%= id('autor') %>" name="autor" type="text" maxlength="60" value="<%= v.autor || '' %>" placeholder="Tu nombre" autocomplete="name">
+    </div>
+    <label class="casilla campo--ancho"><input type="checkbox" name="destacada" value="1"<%= v.destacada ? ' checked' : '' %>><span class="casilla__caja" aria-hidden="true"><%- ICONOS.check %></span><span>Mostrarla como receta destacada en la portada</span></label>
+  </fieldset>
+
+  <div class="formulario__acciones">
+    <p class="formulario__nota"><span class="req" aria-hidden="true">*</span> Obligatorio</p>
+    <% if (esEditar) { %>
+      <a class="btn btn--linea btn--peligro-linea" href="<%= urlReceta(r) %>?eliminar=1#eliminar" data-eliminar="<%= r.id %>" data-nombre="<%= r.nombre %>" data-volver="/#recetario"><%- ICONOS.eliminar %>Eliminar</a>
+      <a class="btn btn--linea" href="<%= urlReceta(r) %>">Cancelar</a>
+      <button class="btn btn--cta" type="submit" data-enviar><span data-enviar-texto>Guardar cambios</span></button>
+    <% } else { %>
+      <a class="btn btn--linea" href="/#recetario" data-cerrar>Cancelar</a>
+      <button class="btn btn--cta" type="submit" data-enviar><span data-enviar-texto>Añadir receta</span></button>
+    <% } %>
+  </div>
+</form>
+<% }
+
+if (locals.parte === 'formulario') {
+  formulario({ modo: locals.modo || 'agregar', receta: locals.receta, valores: locals.valores, errores: locals.errores });
+} else { %><!doctype html>
+<html lang="es-MX" class="no-js">
+<head>
+<%- include('index', { parte: 'head' }) %>
+</head>
+<body class="pagina-editar">
+<%- include('index', { parte: 'cabecera' }) %>
+
+<main id="contenido" class="editar">
+  <div class="contenedor editar__contenedor">
+    <nav class="migas" aria-label="Estás en">
+      <a href="/#recetario">Recetario</a><span aria-hidden="true">›</span>
+      <a href="<%= urlReceta(receta) %>"><%= receta.nombre %></a><span aria-hidden="true">›</span>
+      <span aria-current="page">Editar</span>
+    </nav>
+    <header class="editar__cab">
+      <p class="ceja"><span class="punto" aria-hidden="true"></span>Nº <%= numero(receta.id) %> · <%= receta.tipo %></p>
+      <h1 class="editar__titulo">Editar receta</h1>
+      <p class="editar__intro">Cambia lo que necesites y guarda. Los cambios se ven al momento en el recetario.</p>
+    </header>
+    <div class="editar__caja">
+      <% formulario({ modo: 'editar', receta, valores, errores }) %>
+    </div>
+  </div>
+</main>
+
+<%- include('index', { parte: 'pie' }) %>
+<%- include('index', { parte: 'cierre' }) %>
+</body>
+</html>
+<% } %>

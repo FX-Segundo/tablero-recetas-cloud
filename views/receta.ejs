@@ -1,0 +1,180 @@
+<%
+/* =============================================================================
+   receta.ejs · Página de una receta (y aviso si ya no existe)
+   ============================================================================= */
+const r = locals.receta;
+let ld = null;
+if (r) {
+  const ingredientes = lineas(r.ingredientes).filter((l) => !esSubtitulo(l));
+  ld = {
+    '@context': 'https://schema.org',
+    '@type': 'Recipe',
+    name: r.nombre,
+    description: r.descripcion || undefined,
+    image: [fotoAbsoluta],
+    recipeCategory: r.tipo,
+    recipeCuisine: r.cocina || undefined,
+    prepTime: duracionISO(r.tiempo_preparacion),
+    cookTime: duracionISO(r.tiempo_coccion),
+    totalTime: duracionISO(totalMin(r)),
+    recipeYield: `${r.porciones} porciones`,
+    recipeIngredient: ingredientes,
+    recipeInstructions: lineas(r.pasos).map((texto, i) => ({ '@type': 'HowToStep', position: i + 1, text: texto })),
+    keywords: [r.tipo, r.cocina, ...etiquetasDe(r.etiquetas)].filter(Boolean).join(', '),
+    author: r.autor ? { '@type': 'Person', name: r.autor } : { '@type': 'Organization', name: 'Cuisine' },
+    datePublished: String(r.creada_en).slice(0, 10),
+    url: urlAbsoluta,
+  };
+}
+%><!doctype html>
+<html lang="es-MX" class="no-js">
+<head>
+<%- include('index', { parte: 'head' }) %>
+<% if (ld) { %><script type="application/ld+json"><%- jsonParaScript(ld) %></script><% } %>
+</head>
+<body class="pagina-receta">
+<%- include('index', { parte: 'cabecera' }) %>
+
+<main id="contenido">
+<% if (!r) { %>
+<!-- ===== INICIO Receta no encontrada ===== -->
+<section class="contenedor no-encontrada">
+  <span class="vacio__plato" aria-hidden="true"><span class="punto"></span></span>
+  <p class="ceja"><span class="punto" aria-hidden="true"></span>Sin resultados</p>
+  <h1 class="no-encontrada__titulo">Esta receta ya no está en el recetario</h1>
+  <p>Quizá alguien la eliminó o el enlace cambió. Busca otra: hay muchas más esperando.</p>
+  <div class="no-encontrada__botones">
+    <a class="btn btn--cta" href="/#recetario"><span class="roll" data-text="Buscar receta">Buscar receta</span><%- ICONOS.buscar %></a>
+    <a class="btn btn--linea" href="/?agregar=1#agregar" data-abrir-agregar><%- ICONOS.mas %>Agregar receta</a>
+  </div>
+</section>
+<!-- ===== FIN Receta no encontrada ===== -->
+<% } else {
+  const total = totalMin(r);
+  const etiquetas = etiquetasDe(r.etiquetas);
+  const filas = lineas(r.ingredientes);
+  const pasos = lineas(r.pasos);
+%>
+<article class="receta-pagina" data-receta-pagina data-id="<%= r.id %>">
+  <!-- ===== INICIO Portada de la receta ===== -->
+  <div class="contenedor">
+    <nav class="migas" aria-label="Estás en">
+      <a href="/#recetario">Recetario</a><span aria-hidden="true">›</span>
+      <a href="/?tipo=<%= claveTipo(r.tipo) %>#recetario"><%= r.tipo %></a><span aria-hidden="true">›</span>
+      <span aria-current="page"><%= r.nombre %></span>
+    </nav>
+
+    <% if (confirmarEliminar) { %>
+    <div class="confirmar" id="eliminar" role="alertdialog" aria-labelledby="confirmar-titulo">
+      <h2 class="confirmar__titulo" id="confirmar-titulo">¿Eliminar «<%= r.nombre %>»?</h2>
+      <p>Se borra del recetario para todas las personas y no se puede deshacer.</p>
+      <form method="post" action="/recetas/<%= r.id %>/eliminar" class="confirmar__botones">
+        <a class="btn btn--linea" href="<%= urlReceta(r) %>">Cancelar</a>
+        <button class="btn btn--peligro" type="submit">Sí, eliminar</button>
+      </form>
+    </div>
+    <% } %>
+
+    <header class="receta-portada">
+      <div class="receta-portada__texto">
+        <p class="ceja" data-hero-in><span class="ceja__linea" aria-hidden="true"></span><span class="punto" aria-hidden="true"></span><span>Nº <%= numero(r.id) %> · <%= r.tipo %><%= r.cocina ? ' · ' + r.cocina : '' %></span></p>
+        <h1 class="receta-portada__titulo"><span class="hero__line"><span class="hero__line-in"><%= r.nombre %></span></span></h1>
+        <% if (r.descripcion) { %><p class="receta-portada__desc" data-hero-in><%= r.descripcion %></p><% } %>
+        <dl class="datos datos--receta" data-hero-in>
+          <div><dt>Preparación</dt><dd><%= tiempoTexto(r.tiempo_preparacion) %></dd></div>
+          <div><dt>Cocción</dt><dd><%= tiempoTexto(r.tiempo_coccion) %></dd></div>
+          <div><dt>Total</dt><dd><%= tiempoTexto(total) %></dd></div>
+          <div><dt>Porciones</dt><dd><%= r.porciones %></dd></div>
+          <div><dt>Dificultad</dt><dd><%= r.dificultad %></dd></div>
+        </dl>
+        <% if (etiquetas.length) { %>
+        <ul class="etiquetas" aria-label="Etiquetas" data-hero-in>
+          <% etiquetas.forEach((t) => { %><li><span class="punto" aria-hidden="true"></span><%= t %></li><% }) %>
+        </ul>
+        <% } %>
+        <% if (r.autor) { %><p class="autor" data-hero-in>Compartida por <b><%= r.autor %></b></p><% } %>
+        <div class="receta-portada__acciones" data-hero-in>
+          <a class="btn btn--linea btn--chico" href="/recetas/<%= r.id %>/editar"><%- ICONOS.editar %>Editar</a>
+          <a class="btn btn--linea btn--chico btn--peligro-linea" href="<%= urlReceta(r) %>?eliminar=1#eliminar" data-eliminar="<%= r.id %>" data-nombre="<%= r.nombre %>" data-volver="/#recetario"><%- ICONOS.eliminar %>Eliminar</a>
+          <button class="btn-icono" type="button" data-compartir data-titulo="<%= r.nombre %>" aria-label="Compartir receta" title="Compartir"><%- ICONOS.compartir %></button>
+          <button class="btn-icono" type="button" data-imprimir aria-label="Imprimir receta" title="Imprimir"><%- ICONOS.imprimir %></button>
+        </div>
+      </div>
+      <figure class="plato plato--receta" data-plato-receta data-hero-in>
+        <%- include('index', { parte: 'plato', platoDe: r, platoOpciones: { prioridad: true, especias: true, sizes: '(min-width: 960px) 460px, 84vw' } }) %>
+        <figcaption class="plato__tiempo"><span class="punto" aria-hidden="true"></span><%= tiempoTexto(total) %> en total</figcaption>
+      </figure>
+    </header>
+  </div>
+  <!-- ===== FIN Portada de la receta ===== -->
+
+  <% if (video) { %>
+  <!-- ===== INICIO Video ===== -->
+  <section class="contenedor receta-video" aria-labelledby="t-video">
+    <h2 class="receta-sub" id="t-video"><span class="punto" aria-hidden="true"></span>Video de la preparación</h2>
+    <div class="video<%= video.portada ? '' : ' video--sin-portada' %>" data-video data-embed="<%= video.embed %>" data-video-tipo="<%= video.tipo %>">
+      <% if (video.portada) { %><img src="<%= video.portada %>" alt="" width="480" height="360" loading="lazy" decoding="async"><% } %>
+      <button class="video__play" type="button" aria-label="Reproducir el video de <%= r.nombre %>"><span class="video__boton"><%- ICONOS.play %></span><span class="video__txt">Ver video</span></button>
+    </div>
+    <p class="video__fuente">Video publicado en <%= video.sitio %>. <a href="<%= video.ver %>" target="_blank" rel="noopener">Ábrelo en <%= video.sitio %></a>.</p>
+  </section>
+  <!-- ===== FIN Video ===== -->
+  <% } %>
+
+  <!-- ===== INICIO Ingredientes y preparación ===== -->
+  <div class="contenedor receta-cuerpo">
+    <aside class="ingredientes" aria-labelledby="t-ingredientes">
+      <h2 class="receta-sub" id="t-ingredientes"><span class="punto" aria-hidden="true"></span>Ingredientes</h2>
+      <p class="ingredientes__nota">Para <%= r.porciones %> <%= Number(r.porciones) === 1 ? 'porción' : 'porciones' %>. Palomea lo que ya tienes.</p>
+      <ul class="ingredientes__lista" data-ingredientes>
+        <% filas.forEach((l, i) => { if (esSubtitulo(l)) { %><li class="ingredientes__sub"><%= l.replace(/:$/, '') %></li><% } else { %><li><label class="check"><input type="checkbox" data-check="i<%= i %>"><span class="check__caja" aria-hidden="true"><%- ICONOS.check %></span><span class="check__txt"><%= l %></span></label></li><% } }) %>
+      </ul>
+    </aside>
+
+    <section class="preparacion" aria-labelledby="t-preparacion">
+      <h2 class="receta-sub" id="t-preparacion"><span class="punto" aria-hidden="true"></span>Modo de preparación</h2>
+      <p class="preparacion__nota">Toca cada paso al terminarlo y sigue el punto.</p>
+      <div class="pasos-receta__caja">
+      <span class="punto pasos-receta__punto" aria-hidden="true" data-punto-receta></span>
+      <ol class="pasos-receta" data-pasos>
+        <% pasos.forEach((paso, i) => { %><li class="paso-receta"><label><input class="sr-only" type="checkbox" data-check="p<%= i %>"><span class="paso-receta__num" aria-hidden="true"><span class="paso-receta__n"><%= String(i + 1).padStart(2, '0') %></span><span class="paso-receta__ok"><%- ICONOS.check %></span></span><span class="paso-receta__txt"><span class="sr-only">Paso <%= i + 1 %>: </span><%= paso %></span></label></li><% }) %>
+      </ol>
+      </div>
+      <% if (r.consejo) { %>
+      <aside class="consejo">
+        <img src="/img/toque.png" alt="" width="150" height="106" loading="lazy">
+        <div>
+          <p class="consejo__titulo">Consejo de la cocina</p>
+          <p class="consejo__txt"><%= r.consejo %></p>
+        </div>
+      </aside>
+      <% } %>
+    </section>
+  </div>
+  <!-- ===== FIN Ingredientes y preparación ===== -->
+
+  <% if (relacionadas.length) { %>
+  <!-- ===== INICIO Más recetas ===== -->
+  <section class="sec relacionadas" aria-labelledby="t-relacionadas">
+    <div class="contenedor">
+      <div class="sec__cab">
+        <div class="regla" aria-hidden="true" data-regla><span class="regla__lado"></span><img src="/img/toque.png" alt="" width="150" height="106"><span class="regla__lado regla__lado--der"></span></div>
+        <p class="ceja"><span class="punto" aria-hidden="true"></span>Sigue cocinando</p>
+        <h2 class="h2" id="t-relacionadas" data-split>Más recetas para hoy</h2>
+      </div>
+      <div class="recetas-grid recetas-grid--tres" data-grid-relacionadas>
+        <%- include('index', { parte: 'tarjetas', soloTarjetas: relacionadas }) %>
+      </div>
+      <p class="relacionadas__mas"><a class="btn btn--linea" href="/#recetario">Ver todo el recetario<%- ICONOS.flecha %></a></p>
+    </div>
+  </section>
+  <!-- ===== FIN Más recetas ===== -->
+  <% } %>
+</article>
+<% } %>
+</main>
+
+<%- include('index', { parte: 'pie' }) %>
+<%- include('index', { parte: 'cierre' }) %>
+</body>
+</html>

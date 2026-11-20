@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-label="Receta sin foto">
+  <defs>
+    <radialGradient id="p" cx="68%" cy="28%" r="78%"><stop offset="0" stop-color="#E7AE7A"/><stop offset=".34" stop-color="#CD8D58"/><stop offset=".72" stop-color="#A15E32"/><stop offset="1" stop-color="#7C523A"/></radialGradient>
+    <radialGradient id="luz" cx="50%" cy="45%" r="60%"><stop offset="0" stop-color="#2A2A2A"/><stop offset="1" stop-color="#181713"/></radialGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#luz)"/>
+  <circle cx="400" cy="300" r="170" fill="#0B0B0B" stroke="#997956" stroke-opacity=".55" stroke-width="2"/>
+  <circle cx="400" cy="300" r="128" fill="none" stroke="#997956" stroke-opacity=".25" stroke-width="1.5"/>
+  <circle cx="400" cy="300" r="190" fill="none" stroke="#997956" stroke-opacity=".35" stroke-width="6" stroke-dasharray="1.6 18.3"/>
+  <circle cx="400" cy="300" r="15" fill="url(#p)"/>
+</svg>

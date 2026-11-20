@@ -1,0 +1,27 @@
+{
+  "name": "tablero-recetas-cloud",
+  "version": "1.0.0",
+  "description": "Cuisine: catálogo de recetas con Node.js, Express y EJS. PostgreSQL en Railway y SQLite para pruebas locales.",
+  "main": "server.js",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": "26"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "dotenv": "18.0.10",
+    "ejs": "7.0.2",
+    "express": "5.3.0",
+    "gsap": "3.13.0",
+    "lenis": "1.3.11",
+    "multer": "2.5.0",
+    "pg": "8.23.1"
+  },
+  "optionalDependencies": {
+    "sqlite3": "6.0.1"
+  }
+}
